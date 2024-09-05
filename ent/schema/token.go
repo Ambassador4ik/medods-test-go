@@ -14,7 +14,8 @@ type Token struct {
 func (Token) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("token"),
-		field.UUID("access_token_id", uuid.UUID{}),
+		field.UUID("access_token_id", uuid.UUID{}).
+			Unique(),
 	}
 }
 

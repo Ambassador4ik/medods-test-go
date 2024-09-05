@@ -23,7 +23,7 @@ func getTokens(c *fiber.Ctx) error {
 	ip := c.IP()
 
 	accessTokenId := uuid.New()
-	accessToken, err := jwt.GenerateAccessToken(userGUID, ip, accessTokenId)
+	accessToken, err := jwt.GenerateAccessToken(parsedGUID, ip, accessTokenId)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate access token"})
 	}
