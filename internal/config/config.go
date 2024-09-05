@@ -6,8 +6,7 @@ import (
 )
 
 type Config struct {
-	DBSource     string
-	ClientSecret string
+	DBSource string
 }
 
 func LoadConfig() *Config {

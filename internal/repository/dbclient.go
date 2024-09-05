@@ -10,6 +10,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// Global database client object, can only be initialised once
 var (
 	Client *ent.Client
 	once   sync.Once
@@ -23,6 +24,7 @@ func InitEntClient(cfg *config.Config) {
 			log.Fatalf("Failed opening connection to postgres: %v", err)
 		}
 
+		// Auto apply migrations
 		if err := Client.Schema.Create(context.Background()); err != nil {
 			log.Fatalf("Failed creating schema resources: %v", err)
 		}

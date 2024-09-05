@@ -28,6 +28,8 @@ func getTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate access token"})
 	}
 
+	// Base64 encoded
+	// Should also be URI encoded when sent as a request param
 	refreshToken, err := jwt.GenerateRefreshToken()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate access token"})
@@ -38,6 +40,7 @@ func getTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to hash refresh token"})
 	}
 
+	// Stores new session for the user
 	_, err = dbclient.Client.Token.Create().
 		SetUserID(parsedGUID).
 		SetToken(refreshTokenHash).
@@ -49,6 +52,7 @@ func getTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to store refresh token"})
 	}
 
+	// We should probably consider 'set-cookie' instead
 	return c.JSON(fiber.Map{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,

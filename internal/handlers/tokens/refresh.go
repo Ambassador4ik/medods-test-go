@@ -26,12 +26,14 @@ func refreshTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid refresh token"})
 	}
 
+	// Decoded payload
 	accessTokenClaims, err := jwt.ParseAccessToken(accessToken)
 
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid access token"})
 	}
 
+	// Notify on IP change
 	ip := c.IP()
 	if ip != accessTokenClaims.IP {
 		// Mocked email
@@ -44,6 +46,7 @@ func refreshTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "invalid token pair"})
 	}
 
+	// Clean up database, ensuring one-time usage of refresh token
 	_, err = dbclient.Client.Token.Delete().
 		Where(token.AccessTokenID(accessTokenClaims.ID)).
 		Exec(context.Background())
@@ -67,6 +70,7 @@ func refreshTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to hash refresh token"})
 	}
 
+	// Stores updated session for the user
 	_, err = dbclient.Client.Token.Create().
 		SetUserID(accessTokenClaims.GUID).
 		SetToken(refreshTokenHash).
@@ -77,6 +81,7 @@ func refreshTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to store refresh token"})
 	}
 
+	// We should probably consider 'set-cookie' instead
 	return c.JSON(fiber.Map{
 		"access_token":  newAccessToken,
 		"refresh_token": newRefreshToken,
