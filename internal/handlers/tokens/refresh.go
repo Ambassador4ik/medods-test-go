@@ -1,8 +1,15 @@
 package tokens
 
 import (
+	"context"
+	"github.com/Ambassador4ik/medods-test-go/ent/token"
+	"github.com/Ambassador4ik/medods-test-go/internal/jwt"
+	"github.com/Ambassador4ik/medods-test-go/internal/mail"
+	dbclient "github.com/Ambassador4ik/medods-test-go/internal/repository"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"log"
 )
 
 func refreshTokens(c *fiber.Ctx) error {
@@ -19,5 +26,59 @@ func refreshTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid refresh token"})
 	}
 
-	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid refresh token"})
+	accessTokenClaims, err := jwt.ParseAccessToken(accessToken)
+
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid access token"})
+	}
+
+	ip := c.IP()
+	if ip != accessTokenClaims.IP {
+		// Mocked email
+		const email string = "user@example.com"
+		mail.SendNewIpNotification(ip, email)
+	}
+
+	tokenPairValid := jwt.ValidateTokenPair(accessTokenClaims, refreshToken)
+	if !tokenPairValid {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "invalid token pair"})
+	}
+
+	_, err = dbclient.Client.Token.Delete().
+		Where(token.AccessTokenID(accessTokenClaims.ID)).
+		Exec(context.Background())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not clean up database from old tokens"})
+	}
+
+	accessTokenId := uuid.New()
+	newAccessToken, err := jwt.GenerateAccessToken(accessTokenClaims.GUID, ip, accessTokenId)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate access token"})
+	}
+
+	newRefreshToken, err := jwt.GenerateRefreshToken()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate access token"})
+	}
+
+	refreshTokenHash, err := jwt.HashRefreshToken(refreshToken)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to hash refresh token"})
+	}
+
+	_, err = dbclient.Client.Token.Create().
+		SetUserID(accessTokenClaims.GUID).
+		SetToken(refreshTokenHash).
+		SetAccessTokenID(accessTokenId).
+		Save(context.Background())
+	if err != nil {
+		log.Print(err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to store refresh token"})
+	}
+
+	return c.JSON(fiber.Map{
+		"access_token":  newAccessToken,
+		"refresh_token": newRefreshToken,
+	})
 }
